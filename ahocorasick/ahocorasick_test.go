@@ -9,186 +9,135 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func assert(t *testing.T, b bool) {
-	if !b {
-		t.Fail()
-	}
-}
-
 func TestNoPatterns(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{})
 	hits := m.Match([]byte("foo bar baz"))
-	assert(t, len(hits) == 0)
+	assert.Empty(hits)
 
 	hits = m.MatchThreadSafe([]byte("foo bar baz"))
-	assert(t, len(hits) == 0)
+	assert.Empty(hits)
 }
 
 func TestNoData(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"foo", "baz", "bar"})
 	hits := m.Match([]byte(""))
-	assert(t, len(hits) == 0)
+	assert.Empty(hits)
 
 	hits = m.MatchThreadSafe([]byte(""))
-	assert(t, len(hits) == 0)
+	assert.Empty(hits)
 }
 
 func TestSuffixes(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"Superman", "uperman", "perman", "erman"})
 	hits := m.Match([]byte("The Man Of Steel: Superman"))
-	assert(t, len(hits) == 4)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 2)
-	assert(t, hits[3] == 3)
+	assert.Equal([]Hit{{0, 25}, {1, 25}, {2, 25}, {3, 25}}, hits)
 
 	hits = m.MatchThreadSafe([]byte("The Man Of Steel: Superman"))
-	assert(t, len(hits) == 4)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 2)
-	assert(t, hits[3] == 3)
+	assert.Equal([]Hit{{0, 25}, {1, 25}, {2, 25}, {3, 25}}, hits)
 }
 
 func TestPrefixes(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"Superman", "Superma", "Superm", "Super"})
 	hits := m.Match([]byte("The Man Of Steel: Superman"))
-	assert(t, len(hits) == 4)
-	assert(t, hits[0] == 3)
-	assert(t, hits[1] == 2)
-	assert(t, hits[2] == 1)
-	assert(t, hits[3] == 0)
+	assert.Equal([]Hit{{3, 22}, {2, 23}, {1, 24}, {0, 25}}, hits)
 
 	hits = m.MatchThreadSafe([]byte("The Man Of Steel: Superman"))
-	assert(t, len(hits) == 4)
-	assert(t, hits[0] == 3)
-	assert(t, hits[1] == 2)
-	assert(t, hits[2] == 1)
-	assert(t, hits[3] == 0)
+	assert.Equal([]Hit{{3, 22}, {2, 23}, {1, 24}, {0, 25}}, hits)
 }
 
 func TestInterior(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"Steel", "tee", "e"})
 	hits := m.Match([]byte("The Man Of Steel: Superman"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[2] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[0] == 2)
+	assert.Equal([]Hit{{2, 2}, {1, 14}, {0, 15}}, hits)
 
 	hits = m.MatchThreadSafe([]byte("The Man Of Steel: Superman"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[2] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[0] == 2)
+	assert.Equal([]Hit{{2, 2}, {1, 14}, {0, 15}}, hits)
 }
 
 func TestMatchAtStart(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"The", "Th", "he"})
 	hits := m.Match([]byte("The Man Of Steel: Superman"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 1)
-	assert(t, hits[1] == 0)
-	assert(t, hits[2] == 2)
+	assert.Equal([]Hit{{1, 1}, {0, 2}, {2, 2}}, hits)
 
 	hits = m.MatchThreadSafe([]byte("The Man Of Steel: Superman"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 1)
-	assert(t, hits[1] == 0)
-	assert(t, hits[2] == 2)
+	assert.Equal([]Hit{{1, 1}, {0, 2}, {2, 2}}, hits)
 }
 
 func TestMatchAtEnd(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"teel", "eel", "el"})
 	hits := m.Match([]byte("The Man Of Steel"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 2)
+	assert.Equal([]Hit{{0, 15}, {1, 15}, {2, 15}}, hits)
 
 	hits = m.MatchThreadSafe([]byte("The Man Of Steel"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 2)
+	assert.Equal([]Hit{{0, 15}, {1, 15}, {2, 15}}, hits)
 }
 
 func TestOverlappingPatterns(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"Man ", "n Of", "Of S"})
 	hits := m.Match([]byte("The Man Of Steel"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 2)
+	assert.Equal([]Hit{{0, 7}, {1, 9}, {2, 11}}, hits)
 
 	hits = m.MatchThreadSafe([]byte("The Man Of Steel"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 2)
+	assert.Equal([]Hit{{0, 7}, {1, 9}, {2, 11}}, hits)
 }
 
 func TestMultipleMatches(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"The", "Man", "an"})
 	hits := m.Match([]byte("A Man A Plan A Canal: Panama, which Man Planned The Canal"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 1)
-	assert(t, hits[1] == 2)
-	assert(t, hits[2] == 0)
+	assert.Equal([]Hit{{1, 4}, {2, 4}, {0, 50}}, hits)
 
 	hits = m.MatchThreadSafe([]byte("A Man A Plan A Canal: Panama, which Man Planned The Canal"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 1)
-	assert(t, hits[1] == 2)
-	assert(t, hits[2] == 0)
+	assert.Equal([]Hit{{1, 4}, {2, 4}, {0, 50}}, hits)
 }
 
 func TestSingleCharacterMatches(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"a", "M", "z"})
 	hits := m.Match([]byte("A Man A Plan A Canal: Panama, which Man Planned The Canal"))
-	assert(t, len(hits) == 2)
-	assert(t, hits[0] == 1)
-	assert(t, hits[1] == 0)
+	assert.Equal([]Hit{{1, 2}, {0, 3}}, hits)
 
 	hits = m.MatchThreadSafe([]byte("A Man A Plan A Canal: Panama, which Man Planned The Canal"))
-	assert(t, len(hits) == 2)
-	assert(t, hits[0] == 1)
-	assert(t, hits[1] == 0)
+	assert.Equal([]Hit{{1, 2}, {0, 3}}, hits)
 }
 
 func TestNothingMatches(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"baz", "bar", "foo"})
 	hits := m.Match([]byte("A Man A Plan A Canal: Panama, which Man Planned The Canal"))
-	assert(t, len(hits) == 0)
+	assert.Empty(hits)
 
 	hits = m.MatchThreadSafe([]byte("A Man A Plan A Canal: Panama, which Man Planned The Canal"))
-	assert(t, len(hits) == 0)
+	assert.Empty(hits)
 }
 
 func TestWikipedia(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"a", "ab", "bc", "bca", "c", "caa"})
 	hits := m.Match([]byte("abccab"))
-	assert(t, len(hits) == 4)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 2)
-	assert(t, hits[3] == 4)
+	assert.Equal([]Hit{{0, 0}, {1, 1}, {2, 2}, {4, 2}}, hits)
 
 	hits = m.Match([]byte("bccab"))
-	assert(t, len(hits) == 4)
-	assert(t, hits[0] == 2)
-	assert(t, hits[1] == 4)
-	assert(t, hits[2] == 0)
-	assert(t, hits[3] == 1)
+	assert.Equal([]Hit{{2, 1}, {4, 1}, {0, 3}, {1, 4}}, hits)
 
 	hits = m.Match([]byte("bccb"))
-	assert(t, len(hits) == 2)
-	assert(t, hits[0] == 2)
-	assert(t, hits[1] == 4)
+	assert.Equal([]Hit{{2, 1}, {4, 1}}, hits)
 }
 
 func TestWikipediaConcurrently(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"a", "ab", "bc", "bca", "c", "caa"})
 
 	wg := sync.WaitGroup{}
@@ -196,63 +145,66 @@ func TestWikipediaConcurrently(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		hits := m.MatchThreadSafe([]byte("abccab"))
-		assert(t, len(hits) == 4)
-		assert(t, hits[0] == 0)
-		assert(t, hits[1] == 1)
-		assert(t, hits[2] == 2)
-		assert(t, hits[3] == 4)
+		assert.Equal([]Hit{{0, 0}, {1, 1}, {2, 2}, {4, 2}}, hits)
 	}()
 
 	go func() {
 		defer wg.Done()
 		hits := m.MatchThreadSafe([]byte("bccab"))
-		assert(t, len(hits) == 4)
-		assert(t, hits[0] == 2)
-		assert(t, hits[1] == 4)
-		assert(t, hits[2] == 0)
-		assert(t, hits[3] == 1)
+		assert.Equal([]Hit{{2, 1}, {4, 1}, {0, 3}, {1, 4}}, hits)
 	}()
 
 	go func() {
 		defer wg.Done()
 		hits := m.MatchThreadSafe([]byte("bccb"))
-		assert(t, len(hits) == 2)
-		assert(t, hits[0] == 2)
-		assert(t, hits[1] == 4)
+		assert.Equal([]Hit{{2, 1}, {4, 1}}, hits)
 	}()
 
 	wg.Wait()
 }
 
 func TestMatch(t *testing.T) {
+	assert := assert.New(t)
+	var dictionary = []string{"Mozilla", "Mac", "Macintosh", "Safari", "Sausage"}
 	m := NewStringMatcher(dictionary)
 	hits := m.Match([]byte("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36"))
-	assert(t, len(hits) == 4)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 2)
-	assert(t, hits[3] == 3)
+	assert.Equal([]Hit{{0, 6}, {1, 15}, {2, 21}, {3, 112}}, hits)
 
 	hits = m.Match([]byte("Mozilla/5.0 (Mac; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36"))
-	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 3)
+	assert.Equal([]Hit{{0, 6}, {1, 15}, {3, 106}}, hits)
 
 	hits = m.Match([]byte("Mozilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36"))
-	assert(t, len(hits) == 2)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 3)
+	assert.Equal([]Hit{{0, 6}, {3, 111}}, hits)
 
 	hits = m.Match([]byte("Mozilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
-	assert(t, len(hits) == 1)
-	assert(t, hits[0] == 0)
+	assert.Equal([]Hit{{0, 6}}, hits)
 
 	hits = m.Match([]byte("Mazilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
-	assert(t, len(hits) == 0)
+	assert.Empty(hits)
+}
+
+func TestMatchAll(t *testing.T) {
+	assert := assert.New(t)
+	var dictionary = []string{"Mozilla", "Mac", "Macintosh", "Safari", "Sausage"}
+	m := NewStringMatcher(dictionary)
+	hits := m.MatchAll([]byte("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36 Mac"))
+	assert.Equal([]Hit{{0, 6}, {1, 15}, {2, 21}, {1, 32}, {3, 112}, {1, 123}}, hits)
+
+	hits = m.MatchAll([]byte("Mozilla/5.0 (Mac; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36 Mac"))
+	assert.Equal([]Hit{{0, 6}, {1, 15}, {1, 26}, {3, 106}, {1, 117}}, hits)
+
+	hits = m.MatchAll([]byte("Mozilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36"))
+	assert.Equal([]Hit{{0, 6}, {3, 111}}, hits)
+
+	hits = m.MatchAll([]byte("Mozilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
+	assert.Equal([]Hit{{0, 6}}, hits)
+
+	hits = m.MatchAll([]byte("Mazilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
+	assert.Empty(hits)
 }
 
 func TestMatchThreadSafe(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher([]string{"Mozilla", "Mac", "Macintosh", "Safari", "Sausage"})
 
 	wg := sync.WaitGroup{}
@@ -261,71 +213,107 @@ func TestMatchThreadSafe(t *testing.T) {
 		defer wg.Done()
 
 		hits := m.MatchThreadSafe([]byte("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36"))
-		assert(t, len(hits) == 4)
-		assert(t, hits[0] == 0)
-		assert(t, hits[1] == 1)
-		assert(t, hits[2] == 2)
-		assert(t, hits[3] == 3)
+		assert.Equal([]Hit{{0, 6}, {1, 15}, {2, 21}, {3, 112}}, hits)
 	}()
 
 	go func() {
 		defer wg.Done()
 
 		hits := m.MatchThreadSafe([]byte("Mozilla/5.0 (Mac; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36"))
-		assert(t, len(hits) == 3)
-		assert(t, hits[0] == 0)
-		assert(t, hits[1] == 1)
-		assert(t, hits[2] == 3)
+		assert.Equal([]Hit{{0, 6}, {1, 15}, {3, 106}}, hits)
 	}()
 
 	go func() {
 		defer wg.Done()
 
 		hits := m.MatchThreadSafe([]byte("Mozilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36"))
-		assert(t, len(hits) == 2)
-		assert(t, hits[0] == 0)
-		assert(t, hits[1] == 3)
+		assert.Equal([]Hit{{0, 6}, {3, 111}}, hits)
 	}()
 
 	go func() {
 		defer wg.Done()
 
 		hits := m.MatchThreadSafe([]byte("Mozilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
-		assert(t, len(hits) == 1)
-		assert(t, hits[0] == 0)
+		assert.Equal([]Hit{{0, 6}}, hits)
 	}()
 
 	go func() {
 		defer wg.Done()
 
 		hits := m.MatchThreadSafe([]byte("Mazilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
-		assert(t, len(hits) == 0)
+		assert.Equal(0, len(hits))
+	}()
+
+	wg.Wait()
+}
+
+func TestMatchAllThreadSafe(t *testing.T) {
+	assert := assert.New(t)
+	m := NewStringMatcher([]string{"Mozilla", "Mac", "Macintosh", "Safari", "Sausage"})
+
+	wg := sync.WaitGroup{}
+	wg.Add(5)
+	go func() {
+		defer wg.Done()
+
+		hits := m.MatchAll([]byte("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36 Mac"))
+		assert.Equal([]Hit{{0, 6}, {1, 15}, {2, 21}, {1, 32}, {3, 112}, {1, 123}}, hits)
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		hits := m.MatchAll([]byte("Mozilla/5.0 (Mac; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36 Mac"))
+		assert.Equal([]Hit{{0, 6}, {1, 15}, {1, 26}, {3, 106}, {1, 117}}, hits)
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		hits := m.MatchAll([]byte("Mozilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36"))
+		assert.Equal([]Hit{{0, 6}, {3, 111}}, hits)
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		hits := m.MatchAll([]byte("Mozilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
+		assert.Equal([]Hit{{0, 6}}, hits)
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		hits := m.MatchAll([]byte("Mazilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
+		assert.Equal(0, len(hits))
 	}()
 
 	wg.Wait()
 }
 
 func TestLargeDictionaryMatchThreadSafeWorks(t *testing.T) {
+	assert := assert.New(t)
 	/**
 	 * we have 105 unique words extracted from dictionary, therefore the result
 	 * is supposed to show 105 hits
 	 */
 	hits := precomputed6.MatchThreadSafe(bytes2)
-	assert(t, len(hits) == 105)
+	assert.Equal(105, len(hits))
 
 }
 
 func TestContains(t *testing.T) {
+	assert := assert.New(t)
 	m := NewStringMatcher(dictionary)
 	contains := m.Contains([]byte("Mozilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
-	assert(t, contains)
+	assert.True(contains)
 
 	contains = m.Contains([]byte("Mazilla/5.0 (Moc; Intel Computer OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Sofari/537.36"))
-	assert(t, !contains)
+	assert.False(contains)
 
 	m = NewStringMatcher([]string{"SupermanX", "per"})
 	contains = m.Contains([]byte("The Man Of Steel: Superman"))
-	assert(t, contains == true)
+	assert.True(contains)
 }
 
 var bytes = []byte("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/30.0.1599.101 Safari/537.36")

@@ -61,6 +61,11 @@ type Matcher struct {
 	// a thread-safe manner
 }
 
+type Hit struct {
+	DictIndex int
+	Position  int
+}
+
 // findBlice looks for a blice in the trie starting from the root and
 // returns a pointer to the node representing the end of the blice. If
 // the blice is not found it returns nil.
@@ -221,7 +226,7 @@ func NewStringMatcher(dictionary []string) *Matcher {
 // the original dictionary.
 //
 // This is not thread-safe method, seek for MatchThreadSafe() instead.
-func (m *Matcher) Match(in []byte) []int {
+func (m *Matcher) Match(in []byte) []Hit {
 	m.counter++
 
 	return match(in, m.root, func(f *node) bool {
@@ -233,12 +238,24 @@ func (m *Matcher) Match(in []byte) []int {
 	})
 }
 
+// Match searches in for blices and returns all the blices found as indexes into
+// the original dictionary.
+//
+// This is not thread-safe method, seek for MatchThreadSafe() instead.
+func (m *Matcher) MatchAll(in []byte) []Hit {
+	m.counter++
+
+	return match(in, m.root, func(f *node) bool {
+		return true
+	})
+}
+
 // match is a core of matching logic. Accepts input byte slice, starting node
 // and a func to check whether should we include result into response or not
-func match(in []byte, n *node, unique func(f *node) bool) []int {
-	var hits []int
+func match(in []byte, n *node, unique func(f *node) bool) []Hit {
+	var hits []Hit
 
-	for _, b := range in {
+	for pos, b := range in {
 		c := int(b)
 
 		if !n.root && n.child[c] == nil {
@@ -251,14 +268,14 @@ func match(in []byte, n *node, unique func(f *node) bool) []int {
 
 			if f.output {
 				if unique(f) {
-					hits = append(hits, f.index)
+					hits = append(hits, Hit{DictIndex: f.index, Position: pos})
 				}
 			}
 
 			for !f.suffix.root {
 				f = f.suffix
 				if unique(f) {
-					hits = append(hits, f.index)
+					hits = append(hits, Hit{DictIndex: f.index, Position: pos})
 				} else {
 
 					// There's no point working our way up the
@@ -277,7 +294,7 @@ func match(in []byte, n *node, unique func(f *node) bool) []int {
 // MatchThreadSafe provides the same result as Match() but does it in a
 // thread-safe manner. Uses a sync.Pool of haystacks to track the uniqueness of
 // the result items.
-func (m *Matcher) MatchThreadSafe(in []byte) []int {
+func (m *Matcher) MatchThreadSafe(in []byte) []Hit {
 	var (
 		heap map[int]uint64
 	)
