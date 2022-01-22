@@ -61,6 +61,11 @@ type Matcher struct {
 	// a thread-safe manner
 }
 
+type Hit struct {
+	DictIndex int
+	Position  int
+}
+
 // findBlice looks for a blice in the trie starting from the root and
 // returns a pointer to the node representing the end of the blice. If
 // the blice is not found it returns nil.
@@ -245,11 +250,6 @@ func (m *Matcher) MatchAll(in []byte) []Hit {
 	})
 }
 
-type Hit struct {
-	DictIndex int
-	BytePos   int
-}
-
 // match is a core of matching logic. Accepts input byte slice, starting node
 // and a func to check whether should we include result into response or not
 func match(in []byte, n *node, unique func(f *node) bool) []Hit {
@@ -268,14 +268,14 @@ func match(in []byte, n *node, unique func(f *node) bool) []Hit {
 
 			if f.output {
 				if unique(f) {
-					hits = append(hits, Hit{DictIndex: f.index, BytePos: pos})
+					hits = append(hits, Hit{DictIndex: f.index, Position: pos})
 				}
 			}
 
 			for !f.suffix.root {
 				f = f.suffix
 				if unique(f) {
-					hits = append(hits, Hit{DictIndex: f.index, BytePos: pos})
+					hits = append(hits, Hit{DictIndex: f.index, Position: pos})
 				} else {
 
 					// There's no point working our way up the
